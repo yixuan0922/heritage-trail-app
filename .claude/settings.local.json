@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ngrok version)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
