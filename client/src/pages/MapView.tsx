@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { useAuth } from '@/contexts/AuthContext';
 import { TrailData, WaypointData, UserProgressData } from '@/types/heritage';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -9,15 +11,26 @@ import DestinationsSidebar from '@/components/Sidebar/DestinationsSidebar';
 import WaypointPopup from '@/components/Waypoint/WaypointPopup';
 import FloatingControls from '@/components/Navigation/FloatingControls';
 import BottomNavCard from '@/components/Navigation/BottomNavCard';
+import UserProfileMenu from '@/components/Navigation/UserProfileMenu';
 import { TRAIL_NEIGHBORHOODS } from '@/lib/mapUtils';
 
 export default function MapView() {
+  const { isAdmin } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  // Redirect admins to dashboard only from root path
+  useEffect(() => {
+    if (isAdmin && location === '/') {
+      setLocation('/admin/campaigns');
+    }
+  }, [isAdmin, location, setLocation]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile
   const [selectedWaypoint, setSelectedWaypoint] = useState<WaypointData | null>(null);
   const [activeTrailId, setActiveTrailId] = useState<string>('');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>();
   const [mockUserId] = useState('user_123'); // In a real app, this would come from auth
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -202,21 +215,30 @@ export default function MapView() {
           </div>
           
           <div className="flex items-center space-x-1.5 md:space-x-2 flex-shrink-0">
+            {/* Game Mode Button */}
+            <Button
+              variant="default"
+              size="sm"
+              className="hidden sm:flex"
+              onClick={() => setLocation('/game-mode')}
+            >
+              <i className="fas fa-gamepad mr-2"></i>
+              Game Mode
+            </Button>
+
             {/* Search Bar */}
             <div className="hidden md:flex items-center bg-muted rounded-lg px-3 py-2 max-w-xs">
               <i className="fas fa-search text-muted-foreground text-sm"></i>
-              <input 
-                type="text" 
-                placeholder="Search destinations..." 
+              <input
+                type="text"
+                placeholder="Search destinations..."
                 className="bg-transparent border-none outline-none ml-2 text-sm w-48"
                 data-testid="input-search"
               />
             </div>
-            
+
             {/* User Profile */}
-            <Button variant="ghost" size="sm" className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary p-0 flex-shrink-0">
-              <i className="fas fa-user text-primary-foreground text-sm"></i>
-            </Button>
+            <UserProfileMenu />
           </div>
         </div>
       </nav>

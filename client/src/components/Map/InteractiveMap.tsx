@@ -1,23 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { WaypointData } from '@/types/heritage';
-import { createWaypointMarker, MAP_STYLES, CHINATOWN_CENTER } from '@/lib/mapUtils';
+import { createWaypointMarker, createUserLocationMarker, MAP_STYLES, CHINATOWN_CENTER } from '@/lib/mapUtils';
+import { Crosshair, Plus, Minus } from 'lucide-react';
 
 interface InteractiveMapProps {
   waypoints: WaypointData[];
   onWaypointClick: (waypoint: WaypointData) => void;
   center?: google.maps.LatLngLiteral;
   zoom?: number;
+  userLocation?: google.maps.LatLngLiteral | null;
+  onMapClick?: (location: google.maps.LatLngLiteral) => void;
 }
 
-export default function InteractiveMap({ 
-  waypoints, 
-  onWaypointClick, 
-  center = CHINATOWN_CENTER, 
-  zoom = 16 
+export default function InteractiveMap({
+  waypoints,
+  onWaypointClick,
+  center = CHINATOWN_CENTER,
+  zoom = 16,
+  userLocation,
+  onMapClick
 }: InteractiveMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const userLocationMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [markerLibLoaded, setMarkerLibLoaded] = useState(false);
 
@@ -53,6 +59,33 @@ export default function InteractiveMap({
     });
   }, [isLoaded, center, zoom]);
 
+  // Separate effect for map click listener that updates when onMapClick changes
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+
+    // Change cursor style based on whether onMapClick is provided
+    const mapDiv = mapInstanceRef.current.getDiv();
+    if (onMapClick) {
+      mapDiv.style.cursor = 'crosshair';
+      console.log('Test mode enabled: map click listener added');
+
+      const clickListener = mapInstanceRef.current.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+          console.log('Map clicked:', e.latLng.lat(), e.latLng.lng());
+          onMapClick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }
+      });
+
+      return () => {
+        console.log('Test mode disabled: map click listener removed');
+        mapDiv.style.cursor = '';
+        google.maps.event.removeListener(clickListener);
+      };
+    } else {
+      mapDiv.style.cursor = '';
+    }
+  }, [onMapClick]);
+
   useEffect(() => {
     if (!mapInstanceRef.current || !markerLibLoaded || !waypoints.length) return;
 
@@ -76,9 +109,28 @@ export default function InteractiveMap({
   // Update map center when center prop changes
   useEffect(() => {
     if (!mapInstanceRef.current || !center) return;
-    
+
     mapInstanceRef.current.panTo(center);
   }, [center]);
+
+  // Update user location marker
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markerLibLoaded) return;
+
+    // Remove existing user location marker
+    if (userLocationMarkerRef.current) {
+      userLocationMarkerRef.current.map = null;
+      userLocationMarkerRef.current = null;
+    }
+
+    // Create new user location marker if position is available
+    if (userLocation) {
+      userLocationMarkerRef.current = createUserLocationMarker(
+        mapInstanceRef.current,
+        userLocation
+      );
+    }
+  }, [userLocation, markerLibLoaded]);
 
   const centerToLocation = () => {
     if (!mapInstanceRef.current) return;
@@ -130,28 +182,31 @@ export default function InteractiveMap({
       />
       
       {/* Map Controls */}
-      <button 
+      <button
         onClick={centerToLocation}
-        className="absolute bottom-40 md:bottom-32 right-4 md:right-6 w-12 h-12 md:w-14 md:h-14 bg-card border border-border rounded-full flex items-center justify-center float-shadow hover:bg-muted transition-colors z-20 active:scale-95"
+        className="absolute bottom-40 md:bottom-32 right-4 md:right-6 w-12 h-12 md:w-14 md:h-14 bg-card border border-border rounded-full flex items-center justify-center shadow-lg hover:bg-muted transition-colors z-20 active:scale-95"
         data-testid="button-center-location"
+        title="Center map to my location"
       >
-        <i className="fas fa-crosshairs text-foreground text-lg md:text-xl"></i>
+        <Crosshair className="h-5 w-5 md:h-6 md:w-6 text-foreground" />
       </button>
-      
-      <div className="absolute bottom-[168px] md:bottom-48 right-4 md:right-6 bg-card border border-border rounded-lg overflow-hidden float-shadow z-20">
-        <button 
+
+      <div className="absolute bottom-[168px] md:bottom-48 right-4 md:right-6 bg-card border border-border rounded-lg overflow-hidden shadow-lg z-20">
+        <button
           onClick={zoomIn}
           className="w-12 h-11 md:w-14 md:h-12 flex items-center justify-center hover:bg-muted active:bg-muted transition-colors border-b border-border"
           data-testid="button-zoom-in"
+          title="Zoom in"
         >
-          <i className="fas fa-plus text-foreground text-base md:text-lg"></i>
+          <Plus className="h-5 w-5 md:h-6 md:w-6 text-foreground" />
         </button>
-        <button 
+        <button
           onClick={zoomOut}
           className="w-12 h-11 md:w-14 md:h-12 flex items-center justify-center hover:bg-muted active:bg-muted transition-colors"
           data-testid="button-zoom-out"
+          title="Zoom out"
         >
-          <i className="fas fa-minus text-foreground text-base md:text-lg"></i>
+          <Minus className="h-5 w-5 md:h-6 md:w-6 text-foreground" />
         </button>
       </div>
     </>

@@ -13,14 +13,24 @@ interface WaypointPopupProps {
   onClose: () => void;
   onNavigate: (waypoint: WaypointData) => void;
   onSharePhoto: (waypoint: WaypointData) => void;
+  gameMode?: boolean; // If true, show game mode buttons
+  onContinueToQuestions?: () => void; // Game mode callback for questions
+  onViewHint?: () => void; // Game mode callback for hint
+  hasQuestions?: boolean; // Whether this marker has questions
+  hintText?: string | null; // The hint text to display
 }
 
-export default function WaypointPopup({ 
-  waypoint, 
-  isOpen, 
-  onClose, 
-  onNavigate, 
-  onSharePhoto 
+export default function WaypointPopup({
+  waypoint,
+  isOpen,
+  onClose,
+  onNavigate,
+  onSharePhoto,
+  gameMode = false,
+  onContinueToQuestions,
+  onViewHint,
+  hasQuestions = false,
+  hintText
 }: WaypointPopupProps) {
   const [activeResourceIndex, setActiveResourceIndex] = useState(0);
 
@@ -87,25 +97,54 @@ export default function WaypointPopup({
         <div className="overflow-y-auto custom-scrollbar max-h-[calc(90vh-16rem)] p-6">
           
           {/* Quick Actions */}
-          <div className="flex space-x-3 mb-6">
-            <Button 
-              onClick={() => onNavigate(waypoint)} 
-              className="flex-1"
-              data-testid="button-navigate-waypoint"
-            >
-              <i className="fas fa-route mr-2"></i>Navigate Here
-            </Button>
-            <Button 
-              onClick={() => onSharePhoto(waypoint)}
-              variant="secondary" 
-              className="flex-1"
-              data-testid="button-share-photo"
-            >
-              <i className="fas fa-camera mr-2"></i>Share Photo
-            </Button>
-            <Button variant="outline" size="icon">
-              <i className="fas fa-bookmark"></i>
-            </Button>
+          <div className="flex flex-col space-y-3 mb-6">
+            {!gameMode && (
+              <div className="flex space-x-3">
+                <Button
+                  onClick={() => onNavigate(waypoint)}
+                  className="flex-1"
+                  data-testid="button-navigate-waypoint"
+                >
+                  <i className="fas fa-route mr-2"></i>Navigate Here
+                </Button>
+                <Button
+                  onClick={() => onSharePhoto(waypoint)}
+                  variant="secondary"
+                  className="flex-1"
+                  data-testid="button-share-photo"
+                >
+                  <i className="fas fa-camera mr-2"></i>Share Photo
+                </Button>
+                <Button variant="outline" size="icon">
+                  <i className="fas fa-bookmark"></i>
+                </Button>
+              </div>
+            )}
+            {gameMode && (
+              <>
+                {hasQuestions && onContinueToQuestions && (
+                  <Button
+                    onClick={onContinueToQuestions}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-continue-questions"
+                  >
+                    <i className="fas fa-question-circle mr-2"></i>Continue to Questions
+                  </Button>
+                )}
+                {!hasQuestions && hintText && onViewHint && (
+                  <Button
+                    onClick={onViewHint}
+                    className="w-full"
+                    size="lg"
+                    variant="secondary"
+                    data-testid="button-view-hint"
+                  >
+                    <i className="fas fa-lightbulb mr-2"></i>View Hint to Next Location
+                  </Button>
+                )}
+              </>
+            )}
           </div>
           
           {/* Historical Overview */}

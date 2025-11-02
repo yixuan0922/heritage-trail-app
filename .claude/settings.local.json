@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ngrok version)"
+      "Bash(ngrok version)",
+      "Bash(npm install)",
+      "Bash(npm run db:push:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(chmod:*)",
+      "Bash(/Users/yilonmusk/Documents/GitHub/heritage-trail-app/add_sample_questions.sh)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
