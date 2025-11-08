@@ -7,6 +7,7 @@ import {
   insertVisitorPhotoSchema,
   insertCampaignSchema,
   insertRouteSchema,
+  insertCampaignMarkerSchema,
   insertRouteMarkerSchema,
   insertQuestionSchema,
   insertCampaignProgressSchema,
@@ -384,6 +385,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Campaign Markers endpoints
+  app.get("/api/campaigns/:campaignId/markers", async (req, res) => {
+    try {
+      const markers = await storage.getCampaignMarkersByCampaignId(req.params.campaignId);
+      res.json(markers);
+    } catch (error) {
+      console.error("Error fetching campaign markers:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/campaign-markers/:id", async (req, res) => {
+    try {
+      const marker = await storage.getCampaignMarkerById(req.params.id);
+      if (!marker) {
+        return res.status(404).json({ error: "Campaign marker not found" });
+      }
+      res.json(marker);
+    } catch (error) {
+      console.error("Error fetching campaign marker:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/campaign-markers", async (req, res) => {
+    try {
+      const validatedData = insertCampaignMarkerSchema.parse(req.body);
+      const marker = await storage.createCampaignMarker(validatedData);
+      res.status(201).json(marker);
+    } catch (error) {
+      console.error("Error creating campaign marker:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/campaign-markers/:id", async (req, res) => {
+    try {
+      const marker = await storage.updateCampaignMarker(req.params.id, req.body);
+      res.json(marker);
+    } catch (error) {
+      console.error("Error updating campaign marker:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/campaign-markers/:id", async (req, res) => {
+    try {
+      await storage.deleteCampaignMarker(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting campaign marker:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Route endpoints
   app.get("/api/campaigns/:campaignId/routes", async (req, res) => {
     try {
@@ -445,7 +504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Route Marker endpoints
   app.get("/api/routes/:routeId/markers", async (req, res) => {
     try {
-      const markers = await storage.getMarkersByRouteId(req.params.routeId);
+      // Return markers with full waypoint or campaign marker details
+      const markers = await storage.getMarkersWithDetailsByRouteId(req.params.routeId);
       res.json(markers);
     } catch (error) {
       console.error("Error fetching markers:", error);

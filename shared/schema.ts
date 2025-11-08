@@ -97,10 +97,30 @@ export const routes = pgTable("routes", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Campaign-specific markers that are deleted when campaign is deleted
+export const campaignMarkers = pgTable("campaign_markers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  latitude: real("latitude").notNull(),
+  longitude: real("longitude").notNull(),
+  category: text("category").notNull(),
+  heroImage: text("hero_image"),
+  historicalImage: text("historical_image"),
+  modernImage: text("modern_image"),
+  nlbResources: jsonb("nlb_resources").default(sql`'[]'::jsonb`),
+  audioClip: text("audio_clip"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const routeMarkers = pgTable("route_markers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   routeId: varchar("route_id").notNull().references(() => routes.id, { onDelete: "cascade" }),
-  waypointId: varchar("waypoint_id").notNull().references(() => waypoints.id, { onDelete: "cascade" }),
+  waypointId: varchar("waypoint_id").references(() => waypoints.id, { onDelete: "cascade" }), // Optional: for general waypoints
+  campaignMarkerId: varchar("campaign_marker_id").references(() => campaignMarkers.id, { onDelete: "cascade" }), // Optional: for campaign-specific markers
   orderIndex: integer("order_index").notNull(), // Sequence within the route
   hintToNext: text("hint_to_next"), // Hint given after completing this marker's questions
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -195,12 +215,21 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
     references: [users.id],
   }),
   routes: many(routes),
+  campaignMarkers: many(campaignMarkers),
   campaignProgress: many(campaignProgress),
 }));
 
 export const routesRelations = relations(routes, ({ one, many }) => ({
   campaign: one(campaigns, {
     fields: [routes.campaignId],
+    references: [campaigns.id],
+  }),
+  routeMarkers: many(routeMarkers),
+}));
+
+export const campaignMarkersRelations = relations(campaignMarkers, ({ one, many }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignMarkers.campaignId],
     references: [campaigns.id],
   }),
   routeMarkers: many(routeMarkers),
@@ -214,6 +243,10 @@ export const routeMarkersRelations = relations(routeMarkers, ({ one, many }) => 
   waypoint: one(waypoints, {
     fields: [routeMarkers.waypointId],
     references: [waypoints.id],
+  }),
+  campaignMarker: one(campaignMarkers, {
+    fields: [routeMarkers.campaignMarkerId],
+    references: [campaignMarkers.id],
   }),
   questions: many(questions),
 }));
@@ -298,6 +331,12 @@ export const insertRouteSchema = createInsertSchema(routes).omit({
   updatedAt: true,
 });
 
+export const insertCampaignMarkerSchema = createInsertSchema(campaignMarkers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertRouteMarkerSchema = createInsertSchema(routeMarkers).omit({
   id: true,
   createdAt: true,
@@ -344,6 +383,9 @@ export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 
 export type Route = typeof routes.$inferSelect;
 export type InsertRoute = z.infer<typeof insertRouteSchema>;
+
+export type CampaignMarker = typeof campaignMarkers.$inferSelect;
+export type InsertCampaignMarker = z.infer<typeof insertCampaignMarkerSchema>;
 
 export type RouteMarker = typeof routeMarkers.$inferSelect;
 export type InsertRouteMarker = z.infer<typeof insertRouteMarkerSchema>;

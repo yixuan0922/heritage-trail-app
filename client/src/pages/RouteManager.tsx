@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import { Loader2, Plus, Edit, Trash2, ArrowLeft, MapPin } from 'lucide-react';
-import type { Campaign, Route, RouteMarker, Waypoint, Question } from '@shared/schema';
+import type { Campaign, Route, RouteMarker, Waypoint, Question, CampaignMarker } from '@shared/schema';
 
 export default function RouteManager() {
   const { campaignId } = useParams<{ campaignId: string }>();
@@ -23,7 +23,7 @@ export default function RouteManager() {
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<RouteMarker | null>(null);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
-  const [editingMarker, setEditingMarker] = useState<(RouteMarker & { waypoint: Waypoint }) | null>(null);
+  const [editingMarker, setEditingMarker] = useState<(RouteMarker & { waypoint?: Waypoint; campaignMarker?: CampaignMarker }) | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'route' | 'marker' | 'question', id: string } | null>(null);
@@ -38,7 +38,9 @@ export default function RouteManager() {
 
   // Marker form
   const [markerForm, setMarkerForm] = useState({
+    markerType: 'waypoint' as 'waypoint' | 'campaign',
     waypointId: '',
+    campaignMarkerId: '',
     orderIndex: 0,
     hintToNext: '',
   });
@@ -90,21 +92,23 @@ export default function RouteManager() {
     },
   });
 
-  const { data: markers } = useQuery<(RouteMarker & { waypoint: Waypoint })[]>({
+  const { data: campaignMarkers } = useQuery<CampaignMarker[]>({
+    queryKey: ['campaign-markers', campaignId],
+    queryFn: async () => {
+      const response = await fetch(`/api/campaigns/${campaignId}/markers`);
+      if (!response.ok) throw new Error('Failed to fetch campaign markers');
+      return response.json();
+    },
+    enabled: !!campaignId,
+  });
+
+  const { data: markers } = useQuery<(RouteMarker & { waypoint?: Waypoint; campaignMarker?: CampaignMarker })[]>({
     queryKey: ['markers', selectedRoute?.id],
     queryFn: async () => {
       if (!selectedRoute?.id) return [];
       const response = await fetch(`/api/routes/${selectedRoute.id}/markers`);
       if (!response.ok) throw new Error('Failed to fetch markers');
-      const markersData = await response.json();
-
-      return await Promise.all(
-        markersData.map(async (marker: RouteMarker) => {
-          const waypointResponse = await fetch(`/api/waypoints/${marker.waypointId}`);
-          const waypoint = await waypointResponse.json();
-          return { ...marker, waypoint };
-        })
-      );
+      return response.json();
     },
     enabled: !!selectedRoute?.id,
   });
@@ -140,10 +144,24 @@ export default function RouteManager() {
 
   const createMarkerMutation = useMutation({
     mutationFn: async (data: typeof markerForm) => {
+      // Prepare payload based on marker type
+      const payload: any = {
+        routeId: selectedRoute?.id,
+        orderIndex: data.orderIndex,
+        hintToNext: data.hintToNext,
+      };
+
+      // Add either waypointId or campaignMarkerId
+      if (data.markerType === 'waypoint') {
+        payload.waypointId = data.waypointId;
+      } else {
+        payload.campaignMarkerId = data.campaignMarkerId;
+      }
+
       const response = await fetch('/api/markers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, routeId: selectedRoute?.id }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Failed to create marker');
       return response.json();
@@ -151,7 +169,7 @@ export default function RouteManager() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['markers', selectedRoute?.id] });
       setIsMarkerDialogOpen(false);
-      setMarkerForm({ waypointId: '', orderIndex: 0, hintToNext: '' });
+      setMarkerForm({ markerType: 'waypoint', waypointId: '', campaignMarkerId: '', orderIndex: 0, hintToNext: '' });
     },
   });
 
@@ -204,10 +222,25 @@ export default function RouteManager() {
 
   const updateMarkerMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string, data: typeof markerForm }) => {
+      // Prepare payload based on marker type
+      const payload: any = {
+        orderIndex: data.orderIndex,
+        hintToNext: data.hintToNext,
+      };
+
+      // Add either waypointId or campaignMarkerId
+      if (data.markerType === 'waypoint') {
+        payload.waypointId = data.waypointId;
+        payload.campaignMarkerId = null;
+      } else {
+        payload.campaignMarkerId = data.campaignMarkerId;
+        payload.waypointId = null;
+      }
+
       const response = await fetch(`/api/markers/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Failed to update marker');
       return response.json();
@@ -216,7 +249,7 @@ export default function RouteManager() {
       queryClient.invalidateQueries({ queryKey: ['markers', selectedRoute?.id] });
       setIsMarkerDialogOpen(false);
       setEditingMarker(null);
-      setMarkerForm({ waypointId: '', orderIndex: 0, hintToNext: '' });
+      setMarkerForm({ markerType: 'waypoint', waypointId: '', campaignMarkerId: '', orderIndex: 0, hintToNext: '' });
     },
   });
 
@@ -315,17 +348,19 @@ export default function RouteManager() {
     setIsRouteDialogOpen(true);
   };
 
-  const openMarkerDialog = (marker?: RouteMarker & { waypoint: Waypoint }) => {
+  const openMarkerDialog = (marker?: RouteMarker & { waypoint?: Waypoint; campaignMarker?: CampaignMarker }) => {
     if (marker) {
       setEditingMarker(marker);
       setMarkerForm({
-        waypointId: marker.waypointId,
+        markerType: marker.waypointId ? 'waypoint' : 'campaign',
+        waypointId: marker.waypointId || '',
+        campaignMarkerId: marker.campaignMarkerId || '',
         orderIndex: marker.orderIndex,
         hintToNext: marker.hintToNext || '',
       });
     } else {
       setEditingMarker(null);
-      setMarkerForm({ waypointId: '', orderIndex: 0, hintToNext: '' });
+      setMarkerForm({ markerType: 'waypoint', waypointId: '', campaignMarkerId: '', orderIndex: 0, hintToNext: '' });
     }
     setIsMarkerDialogOpen(true);
   };
@@ -507,23 +542,67 @@ export default function RouteManager() {
                       </DialogHeader>
                       <div className="space-y-4 py-4">
                         <div>
-                          <Label>Waypoint</Label>
+                          <Label>Marker Type</Label>
                           <Select
-                            value={markerForm.waypointId}
-                            onValueChange={(value) => setMarkerForm({ ...markerForm, waypointId: value })}
+                            value={markerForm.markerType}
+                            onValueChange={(value: 'waypoint' | 'campaign') =>
+                              setMarkerForm({ ...markerForm, markerType: value, waypointId: '', campaignMarkerId: '' })
+                            }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select waypoint" />
+                              <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {waypoints?.map((wp) => (
-                                <SelectItem key={wp.id} value={wp.id}>
-                                  {wp.name}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="waypoint">General Waypoint</SelectItem>
+                              <SelectItem value="campaign">Campaign-Specific Marker</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {markerForm.markerType === 'waypoint' ? (
+                          <div>
+                            <Label>Waypoint</Label>
+                            <Select
+                              value={markerForm.waypointId}
+                              onValueChange={(value) => setMarkerForm({ ...markerForm, waypointId: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select waypoint" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {waypoints?.map((wp) => (
+                                  <SelectItem key={wp.id} value={wp.id}>
+                                    {wp.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <div>
+                            <Label>Campaign Marker</Label>
+                            <Select
+                              value={markerForm.campaignMarkerId}
+                              onValueChange={(value) => setMarkerForm({ ...markerForm, campaignMarkerId: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select campaign marker" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {campaignMarkers?.map((cm) => (
+                                  <SelectItem key={cm.id} value={cm.id}>
+                                    {cm.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {(!campaignMarkers || campaignMarkers.length === 0) && (
+                              <p className="text-sm text-muted-foreground mt-2">
+                                No campaign markers yet. Create one in the Campaign Detail page.
+                              </p>
+                            )}
+                          </div>
+                        )}
                         <div>
                           <Label>Hint to Next</Label>
                           <Textarea
@@ -559,7 +638,7 @@ export default function RouteManager() {
                       onClick={() => setSelectedMarker(marker)}
                     >
                       <MapPin className="h-4 w-4 mr-2" />
-                      {marker.waypoint?.name}
+                      {marker.waypoint?.name || marker.campaignMarker?.name}
                     </Button>
                     <Button
                       size="icon"

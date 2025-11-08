@@ -169,14 +169,16 @@ export default function GamePlayMap() {
         const markers = await markersResponse.json();
 
         for (const marker of markers) {
-          const waypointResponse = await fetch(`/api/waypoints/${marker.waypointId}`);
-          const waypoint = await waypointResponse.json();
+          // The API now returns markers with either waypoint or campaignMarker populated
+          const locationData = marker.waypoint || marker.campaignMarker;
+
+          if (!locationData) continue; // Skip if no location data
 
           const distance = calculateDistance(
             userLocation.lat,
             userLocation.lng,
-            waypoint.latitude,
-            waypoint.longitude
+            locationData.latitude,
+            locationData.longitude
           );
 
           // Check if this is the next marker in sequence
@@ -196,7 +198,7 @@ export default function GamePlayMap() {
 
           allMarkersData.push({
             ...marker,
-            waypoint,
+            waypoint: locationData, // Use either waypoint or campaign marker as waypoint
             route,
             isUnlocked: isNextInSequence && withinRange,
             isCompleted,

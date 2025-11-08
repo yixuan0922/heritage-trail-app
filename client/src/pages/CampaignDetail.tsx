@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { Loader2, MapPin, Users, Trophy, ArrowLeft, Play } from 'lucide-react';
 import UserProfileMenu from '../components/Navigation/UserProfileMenu';
+import CampaignMarkerManager from '../components/Admin/CampaignMarkerManager';
 import type { Campaign, User, CampaignProgress } from '@shared/schema';
 
 export default function CampaignDetail() {
@@ -305,6 +306,9 @@ export default function CampaignDetail() {
             </CardContent>
           </Card>
         )}
+
+        {/* Campaign Markers Manager */}
+        <CampaignMarkerManager campaignId={campaignId!} />
       </div>
     </div>
   );

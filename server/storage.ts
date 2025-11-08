@@ -1,6 +1,6 @@
 import {
   users, trails, waypoints, userProgress, visitorPhotos,
-  campaigns, routes, routeMarkers, questions, campaignProgress, questionAttempts,
+  campaigns, routes, campaignMarkers, routeMarkers, questions, campaignProgress, questionAttempts,
   type User, type InsertUser,
   type Trail, type InsertTrail,
   type Waypoint, type InsertWaypoint,
@@ -8,6 +8,7 @@ import {
   type VisitorPhoto, type InsertVisitorPhoto,
   type Campaign, type InsertCampaign,
   type Route, type InsertRoute,
+  type CampaignMarker, type InsertCampaignMarker,
   type RouteMarker, type InsertRouteMarker,
   type Question, type InsertQuestion,
   type CampaignProgress, type InsertCampaignProgress,
@@ -56,6 +57,13 @@ export interface IStorage {
   updateCampaign(id: string, campaign: Partial<Campaign>): Promise<Campaign>;
   deleteCampaign(id: string): Promise<void>;
 
+  // Campaign Markers
+  getCampaignMarkersByCampaignId(campaignId: string): Promise<CampaignMarker[]>;
+  getCampaignMarkerById(id: string): Promise<CampaignMarker | undefined>;
+  createCampaignMarker(marker: InsertCampaignMarker): Promise<CampaignMarker>;
+  updateCampaignMarker(id: string, marker: Partial<CampaignMarker>): Promise<CampaignMarker>;
+  deleteCampaignMarker(id: string): Promise<void>;
+
   // Routes
   getRoutesByCampaignId(campaignId: string): Promise<Route[]>;
   getRouteById(id: string): Promise<Route | undefined>;
@@ -65,6 +73,7 @@ export interface IStorage {
 
   // Route Markers
   getMarkersByRouteId(routeId: string): Promise<RouteMarker[]>;
+  getMarkersWithDetailsByRouteId(routeId: string): Promise<any[]>;
   getMarkerById(id: string): Promise<RouteMarker | undefined>;
   createRouteMarker(marker: InsertRouteMarker): Promise<RouteMarker>;
   updateRouteMarker(id: string, marker: Partial<RouteMarker>): Promise<RouteMarker>;
@@ -292,6 +301,43 @@ export class DatabaseStorage implements IStorage {
     await db.delete(campaigns).where(eq(campaigns.id, id));
   }
 
+  // Campaign Marker methods
+  async getCampaignMarkersByCampaignId(campaignId: string): Promise<CampaignMarker[]> {
+    return await db
+      .select()
+      .from(campaignMarkers)
+      .where(eq(campaignMarkers.campaignId, campaignId));
+  }
+
+  async getCampaignMarkerById(id: string): Promise<CampaignMarker | undefined> {
+    const [marker] = await db
+      .select()
+      .from(campaignMarkers)
+      .where(eq(campaignMarkers.id, id));
+    return marker || undefined;
+  }
+
+  async createCampaignMarker(insertMarker: InsertCampaignMarker): Promise<CampaignMarker> {
+    const [marker] = await db
+      .insert(campaignMarkers)
+      .values(insertMarker)
+      .returning();
+    return marker;
+  }
+
+  async updateCampaignMarker(id: string, updateMarker: Partial<CampaignMarker>): Promise<CampaignMarker> {
+    const [marker] = await db
+      .update(campaignMarkers)
+      .set({ ...updateMarker, updatedAt: new Date() })
+      .where(eq(campaignMarkers.id, id))
+      .returning();
+    return marker;
+  }
+
+  async deleteCampaignMarker(id: string): Promise<void> {
+    await db.delete(campaignMarkers).where(eq(campaignMarkers.id, id));
+  }
+
   // Route methods
   async getRoutesByCampaignId(campaignId: string): Promise<Route[]> {
     return await db
@@ -334,6 +380,43 @@ export class DatabaseStorage implements IStorage {
       .from(routeMarkers)
       .where(eq(routeMarkers.routeId, routeId))
       .orderBy(asc(routeMarkers.orderIndex));
+  }
+
+  // Get markers with full waypoint or campaign marker data
+  async getMarkersWithDetailsByRouteId(routeId: string): Promise<any[]> {
+    const markers = await db
+      .select()
+      .from(routeMarkers)
+      .where(eq(routeMarkers.routeId, routeId))
+      .orderBy(asc(routeMarkers.orderIndex));
+
+    const markersWithDetails = await Promise.all(
+      markers.map(async (marker) => {
+        let locationData = null;
+
+        if (marker.waypointId) {
+          const [waypoint] = await db
+            .select()
+            .from(waypoints)
+            .where(eq(waypoints.id, marker.waypointId));
+          locationData = waypoint;
+        } else if (marker.campaignMarkerId) {
+          const [campaignMarker] = await db
+            .select()
+            .from(campaignMarkers)
+            .where(eq(campaignMarkers.id, marker.campaignMarkerId));
+          locationData = campaignMarker;
+        }
+
+        return {
+          ...marker,
+          waypoint: marker.waypointId ? locationData : null,
+          campaignMarker: marker.campaignMarkerId ? locationData : null,
+        };
+      })
+    );
+
+    return markersWithDetails;
   }
 
   async getMarkerById(id: string): Promise<RouteMarker | undefined> {
