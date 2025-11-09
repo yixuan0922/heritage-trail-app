@@ -109,6 +109,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/waypoints/:id", async (req, res) => {
+    try {
+      const waypoint = await storage.updateWaypoint(req.params.id, req.body);
+      res.json(waypoint);
+    } catch (error) {
+      console.error("Error updating waypoint:", error);
+      if (error instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/waypoints/:id", async (req, res) => {
+    try {
+      await storage.updateWaypoint(req.params.id, { isActive: false });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting waypoint:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Visitor photos endpoints
   app.get("/api/waypoints/:waypointId/photos", async (req, res) => {
     try {

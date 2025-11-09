@@ -13,7 +13,7 @@ import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
 import { Loader2, Plus, Edit, Trash2, MapPin, List, Users, QrCode } from 'lucide-react';
 import UserProfileMenu from '../components/Navigation/UserProfileMenu';
-import type { Campaign, User } from '@shared/schema';
+import type { Campaign, User, Trail } from '@shared/schema';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading } = useAuth();
@@ -58,6 +58,16 @@ export default function AdminDashboard() {
     queryFn: async () => {
       const response = await fetch('/api/campaigns');
       if (!response.ok) throw new Error('Failed to fetch campaigns');
+      return response.json();
+    },
+  });
+
+  // Fetch trails
+  const { data: trails, isLoading: trailsLoading } = useQuery<Trail[]>({
+    queryKey: ['trails'],
+    queryFn: async () => {
+      const response = await fetch('/api/trails');
+      if (!response.ok) throw new Error('Failed to fetch trails');
       return response.json();
     },
   });
@@ -391,9 +401,11 @@ export default function AdminDashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Campaigns List */}
-        <div className="space-y-4">
-          {campaigns?.map((campaign) => (
+        {/* Campaigns Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Game Mode Campaigns</h2>
+          <div className="space-y-4">
+            {campaigns?.map((campaign) => (
             <Card
               key={campaign.id}
               className="cursor-pointer hover:border-primary/50 transition-colors"
@@ -449,11 +461,63 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           ))}
-          {!campaigns || campaigns.length === 0 && (
-            <Card className="p-12 text-center text-muted-foreground">
-              No campaigns yet. Create your first campaign to get started!
-            </Card>
-          )}
+            {!campaigns || campaigns.length === 0 && (
+              <Card className="p-12 text-center text-muted-foreground">
+                No campaigns yet. Create your first campaign to get started!
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Trails & Waypoints Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold mb-4">Heritage Trails & Waypoints</h2>
+          <div className="space-y-4">
+            {trails?.map((trail) => (
+              <Card
+                key={trail.id}
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => setLocation(`/admin/trails/${trail.id}/waypoints`)}
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <CardTitle>{trail.name}</CardTitle>
+                        <Badge variant="outline">{trail.difficulty}</Badge>
+                        <Badge variant="secondary">
+                          {trail.totalWaypoints} waypoints
+                        </Badge>
+                      </div>
+                      <CardDescription>{trail.description}</CardDescription>
+                    </div>
+                    <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setLocation(`/admin/trails/${trail.id}/waypoints`)}
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Manage Waypoints
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-6 text-sm text-muted-foreground">
+                    <div>Neighborhood: {trail.neighborhood}</div>
+                    <div>Duration: {trail.estimatedDuration} min</div>
+                    <div>Created: {new Date(trail.createdAt).toLocaleDateString()}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {!trails || trails.length === 0 && (
+              <Card className="p-12 text-center text-muted-foreground">
+                No trails yet. Trails need to be added via the API or database.
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>
