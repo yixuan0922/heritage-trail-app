@@ -410,78 +410,97 @@ export default function GamePlayMap() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-background border-b p-4 z-10">
-        <div className="container mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{campaign.name}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Trophy className="h-4 w-4" />
-                <span>{progress?.totalScore || 0} points</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                <span>{completedCount} of {totalMarkers} markers</span>
+      <div className="bg-background border-b p-3 md:p-4 z-10">
+        <div className="container mx-auto">
+          {/* Top row - Title and Actions */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            {/* Title and Stats */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold truncate">{campaign.name}</h1>
+              <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-muted-foreground mt-1">
+                <div className="flex items-center gap-1">
+                  <Trophy className="h-3 w-3 md:h-4 md:w-4" />
+                  <span className="hidden sm:inline">{progress?.totalScore || 0} points</span>
+                  <span className="sm:hidden">{progress?.totalScore || 0}pts</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 md:h-4 md:w-4" />
+                  <span>{completedCount} of {totalMarkers} markers</span>
+                </div>
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-1.5 md:gap-2 items-start flex-shrink-0">
+              {/* Test Location Button - Desktop */}
+              <Button
+                variant={isTestLocationMode ? "default" : "outline"}
+                size="sm"
+                className="hidden md:flex"
+                onClick={() => {
+                  const newMode = !isTestLocationMode;
+                  console.log('Test mode toggled:', newMode);
+                  setIsTestLocationMode(newMode);
+                  if (isTestLocationMode) {
+                    console.log('Clearing manual location');
+                    setManualLocation(null);
+                  }
+                }}
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                {isTestLocationMode ? 'Test Mode: ON' : 'Set Test Location'}
+              </Button>
+
+              {/* Test Location Button - Mobile (Icon only) */}
+              <Button
+                variant={isTestLocationMode ? "default" : "outline"}
+                size="sm"
+                className="md:hidden w-8 h-8 p-0"
+                onClick={() => {
+                  const newMode = !isTestLocationMode;
+                  console.log('Test mode toggled:', newMode);
+                  setIsTestLocationMode(newMode);
+                  if (isTestLocationMode) {
+                    console.log('Clearing manual location');
+                    setManualLocation(null);
+                  }
+                }}
+                title="Set Test Location"
+              >
+                <MapPin className="h-4 w-4" />
+              </Button>
+
+              {/* Exit Game Button - Desktop */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden sm:flex"
+                onClick={() => setLocation('/game-mode')}
+              >
+                Exit Game
+              </Button>
+
+              {/* Exit Game Button - Mobile (Icon only) */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="sm:hidden w-8 h-8 p-0"
+                onClick={() => setLocation('/game-mode')}
+                title="Exit Game"
+              >
+                ✕
+              </Button>
+
+              <UserProfileMenu />
+            </div>
           </div>
-          <div className="flex gap-2 items-center">
-            <Button
-              variant={isTestLocationMode ? "default" : "outline"}
-              onClick={() => {
-                const newMode = !isTestLocationMode;
-                console.log('Test mode toggled:', newMode);
-                setIsTestLocationMode(newMode);
-                if (isTestLocationMode) {
-                  // Exiting test mode, clear manual location
-                  console.log('Clearing manual location');
-                  setManualLocation(null);
-                }
-              }}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              {isTestLocationMode ? 'Test Mode: ON' : 'Set Test Location'}
-            </Button>
-            <Button variant="outline" onClick={() => setLocation('/game-mode')}>
-              Exit Game
-            </Button>
-            <UserProfileMenu />
-          </div>
-        </div>
-        <div className="container mx-auto mt-2">
+
+          {/* Progress Bar */}
           <Progress value={progressPercentage} className="h-2" />
         </div>
       </div>
 
-      {/* Test Location Mode Alert */}
-      {isTestLocationMode && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-30 max-w-lg px-4">
-          <Alert className="bg-blue-500/90 text-white border-blue-600 shadow-xl">
-            <MapPin className="h-4 w-4" />
-            <AlertDescription>
-              <div className="font-bold text-base mb-2">🎯 Test Mode Active</div>
-              <div className="text-sm">
-                <strong>Single-tap/click</strong> anywhere on the map to set your test location.
-                {!manualLocation && (
-                  <div className="mt-2 animate-pulse">
-                    👆 Tap the map now to begin testing!
-                  </div>
-                )}
-                {manualLocation && (
-                  <div className="mt-2 p-2 bg-white/20 rounded">
-                    <div className="font-mono text-xs">
-                      📍 Test Location: {manualLocation.lat.toFixed(6)}, {manualLocation.lng.toFixed(6)}
-                    </div>
-                    <div className="text-xs mt-1">
-                      Tap anywhere else to change location
-                    </div>
-                  </div>
-                )}
-              </div>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+      {/* Test Location Mode - Removed blocking alert popup */}
 
       {/* Map */}
       <div className="flex-1 relative">
@@ -573,11 +592,11 @@ export default function GamePlayMap() {
 
         {/* Nearest Marker Card */}
         {allMarkers.length > 0 && (
-          <Card className="absolute bottom-4 left-4 right-4 z-10 max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="text-sm">Next Destination</CardTitle>
+          <Card className="absolute bottom-4 left-4 right-4 z-10 max-w-md mx-auto shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base md:text-lg">Next Destination</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {(() => {
                 const nextMarker = allMarkers.find(m => !completedMarkerIds.has(m.id));
                 if (!nextMarker) {
@@ -631,22 +650,24 @@ export default function GamePlayMap() {
 
                 return (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
                         {nextMarker.isUnlocked ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
                         ) : hint ? (
-                          <Lightbulb className="h-5 w-5 text-yellow-500" />
+                          <Lightbulb className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <Lock className="h-5 w-5 text-gray-400" />
+                          <Lock className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
                         )}
-                        <span className="font-medium">{hint ? 'Follow the clue' : nextMarker.waypoint.name}</span>
+                        <span className="font-medium text-sm md:text-base line-clamp-2">
+                          {hint ? 'Follow the clue' : nextMarker.waypoint.name}
+                        </span>
                       </div>
-                      <Badge variant={nextMarker.isUnlocked ? 'default' : 'secondary'}>
+                      <Badge variant={nextMarker.isUnlocked ? 'default' : 'secondary'} className="flex-shrink-0">
                         {Math.round(nextMarker.distance)}m away
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground italic">
+                    <p className="text-xs md:text-sm text-muted-foreground italic line-clamp-3">
                       {hint ? `"${hint}"` : nextMarker.waypoint.description}
                     </p>
                     {nextMarker.isUnlocked ? (

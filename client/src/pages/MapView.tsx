@@ -215,7 +215,7 @@ export default function MapView() {
           </div>
           
           <div className="flex items-center space-x-1.5 md:space-x-2 flex-shrink-0">
-            {/* Game Mode Button */}
+            {/* Game Mode Button - Desktop */}
             <Button
               variant="default"
               size="sm"
@@ -224,6 +224,17 @@ export default function MapView() {
             >
               <i className="fas fa-gamepad mr-2"></i>
               Game Mode
+            </Button>
+
+            {/* Game Mode Button - Mobile (Icon only) */}
+            <Button
+              variant="default"
+              size="sm"
+              className="sm:hidden w-9 h-9 p-0"
+              onClick={() => setLocation('/game-mode')}
+              title="Game Mode"
+            >
+              <i className="fas fa-gamepad"></i>
             </Button>
 
             {/* Search Bar */}

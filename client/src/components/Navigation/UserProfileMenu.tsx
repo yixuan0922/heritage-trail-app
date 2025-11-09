@@ -58,6 +58,10 @@ export default function UserProfileMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setLocation('/game-mode')} className="sm:hidden">
+          <i className="fas fa-gamepad mr-2 text-sm"></i>
+          <span>Game Mode</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleSettings}>
           <i className="fas fa-cog mr-2 text-sm"></i>
           <span>Settings</span>
