@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import ThenAndNowSlider from './ThenAndNowSlider';
 import PhotoGallery from './PhotoGallery';
+import { generateNLBSearchUrl, generateNLBCustomUrl, getNLBResourceTypeLabel } from '@/lib/nlbUtils';
 
 interface WaypointPopupProps {
   waypoint: WaypointData | null;
@@ -171,44 +172,86 @@ export default function WaypointPopup({
           )}
           
           {/* NLB Digital Resources */}
-          {waypoint.nlbResources.length > 0 && (
-            <section className="mb-8">
-              <h3 className="text-xl font-serif font-bold mb-4 flex items-center">
-                <i className="fas fa-archive text-primary mr-2"></i>
-                NLB Digital Resources
-              </h3>
-              
+          <section className="mb-8">
+            <h3 className="text-xl font-serif font-bold mb-4 flex items-center">
+              <i className="fas fa-archive text-primary mr-2"></i>
+              NLB Digital Resources
+            </h3>
+
+            {waypoint.nlbResources && Array.isArray(waypoint.nlbResources) && waypoint.nlbResources.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {waypoint.nlbResources.map((resource, index) => (
-                  <div
-                    key={index}
-                    onClick={() => setActiveResourceIndex(index)}
-                    className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors cursor-pointer"
-                    data-testid={`resource-card-${index}`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${resourceColors[resource.type]}`}>
-                        <i className={`${resourceIcons[resource.type]} text-xl`}></i>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-sm mb-1">{resource.title}</h4>
-                        <p className="text-xs text-muted-foreground mb-2">{resource.description}</p>
-                        <span className={`text-xs font-medium ${
-                          resource.type === 'photograph' ? 'text-primary' :
-                          resource.type === 'audio' ? 'text-secondary' :
-                          resource.type === 'document' ? 'text-accent' : 'text-chart-4'
-                        }`}>
-                          {resource.type === 'photograph' ? 'View Collection' :
-                           resource.type === 'audio' ? 'Listen Now' :
-                           resource.type === 'document' ? 'Read More' : 'Explore'} →
-                        </span>
+                {waypoint.nlbResources.map((resource: any, index: number) => {
+                  console.log('Processing resource:', resource);
+                  const searchTerms = resource?.searchTerms || resource?.title || waypoint.name;
+
+                  // Only use resource.url if it's a valid URL (not '#' or empty)
+                  const hasValidUrl = resource?.url && resource.url !== '#' && resource.url.trim() !== '';
+                  const resourceUrl = hasValidUrl
+                    ? resource.url
+                    : generateNLBCustomUrl(searchTerms, resource?.type || 'image');
+
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        console.log('Opening NLB resource URL:', resourceUrl);
+                        window.open(resourceUrl, '_blank', 'noopener,noreferrer');
+                      }}
+                      className="border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                      data-testid={`resource-card-${index}`}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${resourceColors[resource.type] || 'bg-primary/10 text-primary'}`}>
+                          <i className={`${resourceIcons[resource.type] || 'fas fa-external-link-alt'} text-xl`}></i>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm mb-1">{resource.title || 'NLB Collection'}</h4>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {resource.description || `Browse ${waypoint.name} resources from NLB`}
+                          </p>
+                          <span className={`text-xs font-medium ${
+                            resource.type === 'photograph' ? 'text-primary' :
+                            resource.type === 'audio' ? 'text-secondary' :
+                            resource.type === 'document' ? 'text-accent' : 'text-chart-4'
+                          }`}>
+                            {getNLBResourceTypeLabel(resource.type)} →
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </section>
-          )}
+            ) : (
+              // Default NLB resource link if no custom resources are defined
+              <div
+                onClick={() => {
+                  console.log('Waypoint name:', waypoint.name);
+                  const url = generateNLBSearchUrl(waypoint.name, 'image');
+                  console.log('Generated NLB URL:', url);
+                  console.log('Full URL check:', url === '#' ? 'URL is just #!' : 'URL looks good');
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+                className="border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                data-testid="default-nlb-resource"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary">
+                    <i className="fas fa-camera text-xl"></i>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold mb-1">View NLB Image Collection</h4>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Browse historical photos and images of {waypoint.name} from the National Library Board
+                    </p>
+                    <span className="text-sm font-medium text-primary">
+                      View Collection →
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
           
           {/* Audio Clip */}
           {waypoint.audioClip && (
