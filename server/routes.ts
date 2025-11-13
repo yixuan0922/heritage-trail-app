@@ -16,6 +16,43 @@ import {
 import { z } from "zod";
 import QRCode from "qrcode";
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), 'dist', 'public', 'uploads', 'photos');
+
+// Ensure upload directory exists
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage_multer = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage_multer,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 // Helper function to generate a short alphanumeric verification code
 function generateVerificationCode(): string {
@@ -145,6 +182,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload endpoint for photos
+  app.post("/api/visitor-photos/upload", upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Return the relative path to the uploaded file
+      const imageUrl = `/uploads/photos/${req.file.filename}`;
+
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/visitor-photos", async (req, res) => {
     try {
       const validatedData = insertVisitorPhotoSchema.parse(req.body);
@@ -157,6 +211,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .status(400)
           .json({ error: "Invalid data", details: error.errors });
       }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get all pending photos for admin review
+  app.get("/api/visitor-photos/pending", async (req, res) => {
+    try {
+      const photos = await storage.getPendingPhotos();
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching pending photos:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get all approved photos for admin management
+  app.get("/api/visitor-photos/approved", async (req, res) => {
+    try {
+      const photos = await storage.getApprovedPhotos();
+      res.json(photos);
+    } catch (error) {
+      console.error("Error fetching approved photos:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Approve a photo
+  app.patch("/api/visitor-photos/:id/approve", async (req, res) => {
+    try {
+      const photo = await storage.approvePhoto(req.params.id);
+      res.json(photo);
+    } catch (error) {
+      console.error("Error approving photo:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Reject/Delete a photo
+  app.delete("/api/visitor-photos/:id", async (req, res) => {
+    try {
+      await storage.deletePhoto(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting photo:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

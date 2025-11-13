@@ -46,8 +46,10 @@ export interface IStorage {
   // Visitor Photos
   getPhotosByWaypointId(waypointId: string): Promise<VisitorPhoto[]>;
   createVisitorPhoto(photo: InsertVisitorPhoto): Promise<VisitorPhoto>;
-  approveVisitorPhoto(id: string): Promise<VisitorPhoto>;
-  deleteVisitorPhoto(id: string): Promise<void>;
+  getPendingPhotos(): Promise<VisitorPhoto[]>;
+  getApprovedPhotos(): Promise<VisitorPhoto[]>;
+  approvePhoto(id: string): Promise<VisitorPhoto>;
+  deletePhoto(id: string): Promise<void>;
 
   // Campaigns
   getAllCampaigns(): Promise<Campaign[]>;
@@ -207,7 +209,23 @@ export class DatabaseStorage implements IStorage {
     return photo;
   }
 
-  async approveVisitorPhoto(id: string): Promise<VisitorPhoto> {
+  async getPendingPhotos(): Promise<VisitorPhoto[]> {
+    return await db
+      .select()
+      .from(visitorPhotos)
+      .where(eq(visitorPhotos.isApproved, false))
+      .orderBy(desc(visitorPhotos.uploadedAt));
+  }
+
+  async getApprovedPhotos(): Promise<VisitorPhoto[]> {
+    return await db
+      .select()
+      .from(visitorPhotos)
+      .where(eq(visitorPhotos.isApproved, true))
+      .orderBy(desc(visitorPhotos.uploadedAt));
+  }
+
+  async approvePhoto(id: string): Promise<VisitorPhoto> {
     const [photo] = await db
       .update(visitorPhotos)
       .set({ isApproved: true })
@@ -216,7 +234,7 @@ export class DatabaseStorage implements IStorage {
     return photo;
   }
 
-  async deleteVisitorPhoto(id: string): Promise<void> {
+  async deletePhoto(id: string): Promise<void> {
     await db.delete(visitorPhotos).where(eq(visitorPhotos.id, id));
   }
 

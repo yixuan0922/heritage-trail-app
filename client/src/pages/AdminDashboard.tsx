@@ -11,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { Badge } from '../components/ui/badge';
-import { Loader2, Plus, Edit, Trash2, MapPin, List, Users, QrCode } from 'lucide-react';
+import { Loader2, Plus, Edit, Trash2, MapPin, List, Users, QrCode, Image } from 'lucide-react';
 import UserProfileMenu from '../components/Navigation/UserProfileMenu';
 import type { Campaign, User, Trail } from '@shared/schema';
 
@@ -193,6 +193,14 @@ export default function AdminDashboard() {
             <p className="text-muted-foreground">Manage campaigns, routes, and challenges</p>
           </div>
           <div className="flex gap-2 items-center">
+            <Button variant="outline" onClick={() => setLocation('/admin/photo-moderation')}>
+              <Image className="h-4 w-4 mr-2" />
+              Photo Moderation
+            </Button>
+            <Button variant="outline" onClick={() => setLocation('/admin/photo-management')}>
+              <Image className="h-4 w-4 mr-2" />
+              Manage Photos
+            </Button>
             <Button variant="outline" onClick={() => setLocation('/admin/qr-scanner')}>
               <QrCode className="h-4 w-4 mr-2" />
               QR Scanner

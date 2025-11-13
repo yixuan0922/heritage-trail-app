@@ -14,6 +14,8 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import CampaignDetail from "@/pages/CampaignDetail";
 import RouteManager from "@/pages/RouteManager";
 import WaypointManager from "@/pages/WaypointManager";
+import PhotoModeration from "@/pages/PhotoModeration";
+import PhotoManagement from "@/pages/PhotoManagement";
 import QRScanner from "@/pages/QRScanner";
 import NotFound from "@/pages/not-found";
 
@@ -32,6 +34,8 @@ function Router() {
       <Route path="/admin/campaigns/:campaignId" component={CampaignDetail} />
       <Route path="/admin/campaigns/:campaignId/routes" component={RouteManager} />
       <Route path="/admin/trails/:trailId/waypoints" component={WaypointManager} />
+      <Route path="/admin/photo-moderation" component={PhotoModeration} />
+      <Route path="/admin/photo-management" component={PhotoManagement} />
       <Route path="/admin/qr-scanner" component={QRScanner} />
       <Route component={NotFound} />
     </Switch>

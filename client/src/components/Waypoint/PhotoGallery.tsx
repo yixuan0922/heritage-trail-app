@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { VisitorPhotoData } from '@/types/heritage';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { ObjectUploader } from '@/components/ObjectUploader';
-import type { UploadResult } from '@uppy/core';
+import { Textarea } from '@/components/ui/textarea';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { Upload, X } from 'lucide-react';
 
 interface PhotoGalleryProps {
   photos: VisitorPhotoData[];
@@ -32,9 +32,10 @@ function PhotoLightbox({ photos, currentIndex, isOpen, onClose }: PhotoLightboxP
   };
   
   if (!photos.length) return null;
-  
+
   const currentPhoto = photos[activeIndex];
-  
+  if (!currentPhoto) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[95vh] p-0" data-testid="photo-lightbox">
@@ -89,46 +90,77 @@ function PhotoLightbox({ photos, currentIndex, isOpen, onClose }: PhotoLightboxP
 export default function PhotoGallery({ photos, waypointId, onUploadPhoto }: PhotoGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState(-1);
   const [showUploader, setShowUploader] = useState(false);
+  const [uploadCaption, setUploadCaption] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
+  // Filter to show only approved photos
+  const approvedPhotos = photos.filter(photo => photo.isApproved);
+
   const uploadMutation = useMutation({
-    mutationFn: async ({ imageURL, username, caption }: { imageURL: string; username: string; caption?: string }) => {
-      // First normalize the path
-      const { objectPath } = await apiRequest('PUT', '/api/visitor-photos/upload', { imageURL }).then(r => r.json());
-      
-      // Then create the photo record
+    mutationFn: async ({ file, caption }: { file: File; caption?: string }) => {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      // Upload the file
+      const uploadResponse = await fetch('/api/visitor-photos/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const { imageUrl } = await uploadResponse.json();
+
+      // Create the photo record in database
+      const username = `visitor_${Date.now()}`; // In a real app, this would come from auth
       return await apiRequest('POST', '/api/visitor-photos', {
         waypointId,
         username,
-        imageUrl: objectPath,
+        imageUrl,
         caption,
       }).then(r => r.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/waypoints', waypointId, 'photos'] });
       setShowUploader(false);
+      setUploadCaption('');
+      setSelectedFile(null);
+      setPreviewUrl(null);
     },
   });
 
-  const getUploadParameters = async () => {
-    const response = await apiRequest('POST', '/api/objects/upload', {});
-    const { uploadURL } = await response.json();
-    return {
-      method: 'PUT' as const,
-      url: uploadURL,
-    };
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleUploadComplete = (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    const uploadedFile = result.successful?.[0];
-    if (uploadedFile?.uploadURL) {
-      const username = `visitor_${Date.now()}`; // In a real app, this would come from auth
-      uploadMutation.mutate({ 
-        imageURL: uploadedFile.uploadURL,
-        username,
-        caption: `Great memories at this heritage site!`,
+  const handleUpload = () => {
+    if (selectedFile) {
+      uploadMutation.mutate({
+        file: selectedFile,
+        caption: uploadCaption.trim() || undefined,
       });
     }
+  };
+
+  const handleCancelUpload = () => {
+    setShowUploader(false);
+    setUploadCaption('');
+    setSelectedFile(null);
+    setPreviewUrl(null);
   };
 
   return (
@@ -138,12 +170,12 @@ export default function PhotoGallery({ photos, waypointId, onUploadPhoto }: Phot
           <i className="fas fa-users text-primary mr-2"></i>
           Visitor Memories
         </h3>
-        <span className="text-sm text-muted-foreground">{photos.length} photos</span>
+        <span className="text-sm text-muted-foreground">{approvedPhotos.length} photos</span>
       </div>
-      
-      {photos.length > 0 ? (
+
+      {approvedPhotos.length > 0 ? (
         <div className="masonry-grid">
-          {photos.map((photo, index) => (
+          {approvedPhotos.map((photo, index) => (
             <div 
               key={photo.id}
               className="masonry-item group cursor-pointer" 
@@ -176,27 +208,85 @@ export default function PhotoGallery({ photos, waypointId, onUploadPhoto }: Phot
       {/* Upload Photo Button */}
       <div className="mt-4">
         {showUploader ? (
-          <div className="border-2 border-dashed border-primary rounded-lg p-6">
-            <ObjectUploader
-              maxNumberOfFiles={1}
-              maxFileSize={10485760} // 10MB
-              onGetUploadParameters={getUploadParameters}
-              onComplete={handleUploadComplete}
-              buttonClassName="w-full"
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <i className="fas fa-camera-retro text-xl"></i>
-                <span className="font-medium">Select Photo to Upload</span>
-              </div>
-            </ObjectUploader>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setShowUploader(false)}
-              className="mt-2 w-full"
-            >
-              Cancel
-            </Button>
+          <div className="border-2 border-dashed border-primary rounded-lg p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Share your memory and story
+              </label>
+              <Textarea
+                value={uploadCaption}
+                onChange={(e) => setUploadCaption(e.target.value)}
+                placeholder="Tell us about your experience at this heritage site... What did you see? What did you learn? What memories will you take away?"
+                className="resize-none"
+                rows={3}
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                {uploadCaption.length}/500 characters • Your photo will be reviewed before appearing in the gallery
+              </p>
+            </div>
+
+            {/* File Upload Area */}
+            <div className="w-full">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {previewUrl ? (
+                <div className="relative">
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 rounded-lg p-8 text-center cursor-pointer transition-colors"
+                >
+                  <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-medium mb-1">Click to select a photo</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 10MB</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleUpload}
+                disabled={!selectedFile || uploadMutation.isPending}
+                className="flex-1"
+              >
+                {uploadMutation.isPending ? 'Uploading...' : 'Upload Photo'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleCancelUpload}
+                disabled={uploadMutation.isPending}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         ) : (
           <Button
@@ -213,7 +303,7 @@ export default function PhotoGallery({ photos, waypointId, onUploadPhoto }: Phot
 
       {/* Photo Lightbox */}
       <PhotoLightbox
-        photos={photos}
+        photos={approvedPhotos}
         currentIndex={lightboxIndex}
         isOpen={lightboxIndex >= 0}
         onClose={() => setLightboxIndex(-1)}
