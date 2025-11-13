@@ -56,10 +56,10 @@ export default function ThenAndNowSlider({ historicalImage, modernImage }: ThenA
       
       {/* Labels */}
       <div className="absolute top-4 left-4 px-3 py-1 bg-black/70 text-white text-xs font-medium rounded-full pointer-events-none">
-        Historical
+        Today
       </div>
       <div className="absolute top-4 right-4 px-3 py-1 bg-black/70 text-white text-xs font-medium rounded-full pointer-events-none">
-        Today
+        Historical
       </div>
     </div>
   );
